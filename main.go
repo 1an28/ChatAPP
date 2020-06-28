@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -18,77 +17,89 @@ type Messages struct {
 	Num  int
 }
 
-func main() {
+func ConectRoute() *gin.Engine {
 	router := gin.Default()
 	router.LoadHTMLGlob("*.html")
 
-	num := 0
+	return router
+}
 
-	router.GET("/", func(ctx *gin.Context) {
+func GetCollection() *mongo.Collection {
+	//mongoDBのクライアント作成＋mongoDBに接続
+	mongoCtx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	client, _ := mongo.Connect(mongoCtx, options.Client().ApplyURI("mongodb://localhost:27017"))
 
-		//mongoDBのクライアント作成＋mongoDBに接続
-		mongoCtx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		client, _ := mongo.Connect(mongoCtx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	//mongoDBのDBのCollectionの取得
+	collection := client.Database("GOChat").Collection("messages")
 
-		//mongoDBのDBのCollectionの取得
-		collection := client.Database("GOChat").Collection("messages")
+	return collection
+}
 
-		// Pass these options to the Find method
-		findOptions := options.Find()
+func GetMessage(collection *mongo.Collection) []*Messages {
+	// 検索オプション設定
+	findOptions := options.Find()
 
-		// Here's an array in which you can store the decoded documents
-		var results []*Messages
+	// 戻り値
+	var results []*Messages
 
-		// Passing bson.D{{}} as the filter matches all documents in the collection
-		cur, err := collection.Find(context.TODO(), bson.D{{}}, findOptions)
+	// Passing bson.D{{}} as the filter matches all documents in the collection
+	cur, err := collection.Find(context.TODO(), bson.D{{}}, findOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Finding multiple documents returns a cursor
+	// Iterating through the cursor allows us to decode documents one at a time
+	for cur.Next(context.TODO()) {
+
+		// create a value into which the single document can be decoded
+		var elem Messages
+		err := cur.Decode(&elem)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		// Finding multiple documents returns a cursor
-		// Iterating through the cursor allows us to decode documents one at a time
-		for cur.Next(context.TODO()) {
+		results = append(results, &elem)
+	}
 
-			// create a value into which the single document can be decoded
-			var elem Messages
-			err := cur.Decode(&elem)
-			if err != nil {
-				log.Fatal(err)
-			}
+	if err := cur.Err(); err != nil {
+		log.Fatal(err)
+	}
 
-			results = append(results, &elem)
-		}
+	// Close the cursor once finished
+	cur.Close(context.TODO())
 
-		if err := cur.Err(); err != nil {
-			log.Fatal(err)
-		}
+	return results
+}
 
-		// Close the cursor once finished
-		cur.Close(context.TODO())
-		fmt.Println(results)
+func MainChat(ctx *gin.Context) {
 
-		for i := 0; i < len(results); i++ {
-			fmt.Println(results[i])
-		}
-		ctx.HTML(200, "index.html", gin.H{"messages": results})
-	})
+	collection := GetCollection()
 
-	router.POST("/message", func(ctx *gin.Context) {
-		text := ctx.PostForm("message")
-		message := Messages{text, num}
-		num++
-		//mongoDBのクライアント作成＋mongoDBに接続
-		mongoCtx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		client, _ := mongo.Connect(mongoCtx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	results := GetMessage(collection)
 
-		//mongoDBのDBのCollectionの取得
-		collection := client.Database("GOChat").Collection("messages")
+	ctx.HTML(200, "index.html", gin.H{"messages": results})
 
-		//Insert the data.
-		collection.InsertOne(context.TODO(), message)
+}
 
-		ctx.Redirect(302, "/")
-	})
+func SendMessage(ctx *gin.Context) {
+	text := ctx.PostForm("message")
+	message := Messages{text, 0}
+
+	collection := GetCollection()
+
+	//Insert the data.
+	collection.InsertOne(context.TODO(), message)
+
+	ctx.Redirect(302, "/")
+}
+
+func main() {
+
+	router := ConectRoute()
+
+	router.GET("/", MainChat)
+	router.POST("/message", SendMessage)
 
 	router.Run()
 }
