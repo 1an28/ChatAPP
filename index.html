@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>GOCHAT</title>
+    <script src="https://kit.fontawesome.com/0113c77888.js" crossorigin="anonymous"></script>
+</head>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .main {
+        height: 100vh;
+        width: 30%;
+        margin: 0 auto;
+        text-align: center;
+        background-color: gainsboro;
+    }
+
+    .messageArea {
+        height: 95%;
+    }
+    .formArea {
+        height: 5%;
+        width: 100%;
+    }
+    .form {
+        height: 100%;
+    }
+    .text {
+        height: 100%;
+        width: 80%;
+    }
+    .btn {
+        height: 100%;
+        width: 10%;
+    }
+    .message {
+        list-style: none;
+    }
+
+</style>
+<body>
+    <div class="main">
+        <div class="messageArea">
+            <ol class="message">
+                {{range .messages}}
+                <li>{{.Text}}</li>
+                {{end}}    
+            </ol>
+        </div>
+
+        <div class="formArea">
+            <form class="form" action="/message" method="POST">
+                <input class="text" type="text" name="message">
+                <button class="btn"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+
+    </div>
+    
+</body>
+</html>
